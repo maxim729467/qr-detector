@@ -1,0 +1,55 @@
+{
+    "name": "@yourusername/qr-code-detector",
+    "version": "1.0.0",
+    "description": "High-performance QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV.",
+    "main": "index.js",
+    "scripts": {
+        "install": "node-gyp rebuild",
+        "test": "node -e \"require('.').detectQRCode('./test-image.jpg').then(r => console.log('Test passed:', r.detected))\"",
+        "prepublishOnly": "node-gyp rebuild"
+    },
+    "keywords": [
+        "qr",
+        "qr-code",
+        "qrcode",
+        "detector",
+        "decoder",
+        "opencv",
+        "barcode",
+        "image-processing",
+        "computer-vision",
+        "base64",
+        "native-addon",
+        "camera",
+        "scanner"
+    ],
+    "author": "Your Name <your.email@example.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/yourusername/qr-code-detector.git"
+    },
+    "bugs": {
+        "url": "https://github.com/yourusername/qr-code-detector/issues"
+    },
+    "homepage": "https://github.com/yourusername/qr-code-detector#readme",
+    "dependencies": {
+        "node-addon-api": "^7.1.0"
+    },
+    "devDependencies": {
+        "node-gyp": "^10.0.0"
+    },
+    "gypfile": true,
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "os": [
+        "darwin",
+        "linux",
+        "win32"
+    ],
+    "cpu": [
+        "x64",
+        "arm64"
+    ]
+}
