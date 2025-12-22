@@ -1,7 +1,7 @@
 {
-    "name": "@yourusername/qr-code-detector",
+    "name": "qr-code-detector",
     "version": "1.0.0",
-    "description": "High-performance QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV.",
+    "description": "QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV.",
     "main": "index.js",
     "scripts": {
         "install": "node-gyp rebuild",
@@ -23,16 +23,16 @@
         "camera",
         "scanner"
     ],
-    "author": "Your Name <your.email@example.com>",
+    "author": "Maksym Shyshko <maxim.shishko95@gmail.com>",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/yourusername/qr-code-detector.git"
+        "url": "git+https://github.com/maxim729467/qr-code-detector.git"
     },
     "bugs": {
-        "url": "https://github.com/yourusername/qr-code-detector/issues"
+        "url": "https://github.com/maxim729467/qr-code-detector/issues"
     },
-    "homepage": "https://github.com/yourusername/qr-code-detector#readme",
+    "homepage": "https://github.com/maxim729467/qr-code-detector#readme",
     "dependencies": {
         "node-addon-api": "^7.1.0"
     },
