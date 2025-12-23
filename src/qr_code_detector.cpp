@@ -46,8 +46,8 @@ Napi::Object DetectQRCode(const Napi::CallbackInfo& info) {
         std::vector<cv::Point> points;
         std::string decodedData = qrDecoder.detectAndDecode(image, points);
         
-        // If decoding failed but detection succeeded, try with grayscale and preprocessing
-        if (decodedData.empty() && !points.empty()) {
+        // If not detected, try multiple preprocessing approaches
+        if (decodedData.empty()) {
             cv::Mat gray;
             if (image.channels() == 3) {
                 cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
@@ -55,15 +55,136 @@ Napi::Object DetectQRCode(const Napi::CallbackInfo& info) {
                 gray = image.clone();
             }
             
-            // Try with adaptive thresholding
-            cv::Mat binary;
-            cv::adaptiveThreshold(gray, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 11, 2);
-            decodedData = qrDecoder.detectAndDecode(binary, points);
-            
-            // If still empty, try with Otsu's thresholding
+            // Method 1: Contrast enhancement with CLAHE
             if (decodedData.empty()) {
+                cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+                cv::Mat enhanced;
+                clahe->apply(gray, enhanced);
+                decodedData = qrDecoder.detectAndDecode(enhanced, points);
+            }
+            
+            // Method 2: Adaptive thresholding (multiple block sizes)
+            if (decodedData.empty()) {
+                for (int blockSize : {11, 15, 21, 31, 51}) {
+                    cv::Mat binary;
+                    cv::adaptiveThreshold(gray, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                        cv::THRESH_BINARY, blockSize, 2);
+                    decodedData = qrDecoder.detectAndDecode(binary, points);
+                    if (!decodedData.empty()) break;
+                }
+            }
+            
+            // Method 3: Otsu's thresholding
+            if (decodedData.empty()) {
+                cv::Mat binary;
                 cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
                 decodedData = qrDecoder.detectAndDecode(binary, points);
+            }
+            
+            // Method 4: Inverted Otsu (for dark QR on light background)
+            if (decodedData.empty()) {
+                cv::Mat binary;
+                cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+                decodedData = qrDecoder.detectAndDecode(binary, points);
+            }
+            
+            // Method 5: Bilateral filter + adaptive threshold (noise reduction)
+            if (decodedData.empty()) {
+                cv::Mat filtered;
+                cv::bilateralFilter(gray, filtered, 9, 75, 75);
+                cv::Mat binary;
+                cv::adaptiveThreshold(filtered, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                    cv::THRESH_BINARY, 11, 2);
+                decodedData = qrDecoder.detectAndDecode(binary, points);
+            }
+            
+            // Method 6: Morphological operations
+            if (decodedData.empty()) {
+                cv::Mat binary;
+                cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+                cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+                cv::morphologyEx(binary, binary, cv::MORPH_CLOSE, kernel);
+                decodedData = qrDecoder.detectAndDecode(binary, points);
+            }
+            
+            // Method 7: Sharpen the image
+            if (decodedData.empty()) {
+                cv::Mat sharpened;
+                cv::Mat kernel = (cv::Mat_<float>(3,3) << 
+                    0, -1, 0,
+                    -1, 5, -1,
+                    0, -1, 0);
+                cv::filter2D(gray, sharpened, -1, kernel);
+                decodedData = qrDecoder.detectAndDecode(sharpened, points);
+            }
+            
+            // Method 8: Resize larger (for small QR codes)
+            if (decodedData.empty() && (gray.cols < 800 || gray.rows < 800)) {
+                cv::Mat resized;
+                cv::resize(gray, resized, cv::Size(), 2.0, 2.0, cv::INTER_CUBIC);
+                decodedData = qrDecoder.detectAndDecode(resized, points);
+                // Adjust points back to original scale
+                if (!decodedData.empty() && !points.empty()) {
+                    for (auto& point : points) {
+                        point.x /= 2.0;
+                        point.y /= 2.0;
+                    }
+                }
+            }
+            
+            // Method 9: Gamma correction for low light images
+            if (decodedData.empty()) {
+                for (double gamma : {0.5, 0.7, 1.5, 2.0}) {
+                    cv::Mat lookUpTable(1, 256, CV_8U);
+                    uchar* p = lookUpTable.ptr();
+                    for(int i = 0; i < 256; ++i)
+                        p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, gamma) * 255.0);
+                    
+                    cv::Mat corrected;
+                    cv::LUT(gray, lookUpTable, corrected);
+                    decodedData = qrDecoder.detectAndDecode(corrected, points);
+                    if (!decodedData.empty()) break;
+                }
+            }
+            
+            // Method 10: Histogram equalization
+            if (decodedData.empty()) {
+                cv::Mat equalized;
+                cv::equalizeHist(gray, equalized);
+                decodedData = qrDecoder.detectAndDecode(equalized, points);
+            }
+            
+            // Method 11: Combination - CLAHE + Bilateral + Adaptive Threshold
+            if (decodedData.empty()) {
+                cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4.0, cv::Size(8, 8));
+                cv::Mat enhanced;
+                clahe->apply(gray, enhanced);
+                
+                cv::Mat filtered;
+                cv::bilateralFilter(enhanced, filtered, 9, 75, 75);
+                
+                cv::Mat binary;
+                cv::adaptiveThreshold(filtered, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                    cv::THRESH_BINARY, 21, 2);
+                decodedData = qrDecoder.detectAndDecode(binary, points);
+            }
+            
+            // Method 12: Try on resized + enhanced version
+            if (decodedData.empty()) {
+                cv::Mat resized;
+                cv::resize(gray, resized, cv::Size(), 1.5, 1.5, cv::INTER_CUBIC);
+                
+                cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+                cv::Mat enhanced;
+                clahe->apply(resized, enhanced);
+                
+                decodedData = qrDecoder.detectAndDecode(enhanced, points);
+                if (!decodedData.empty() && !points.empty()) {
+                    for (auto& point : points) {
+                        point.x /= 1.5;
+                        point.y /= 1.5;
+                    }
+                }
             }
         }
 
@@ -197,10 +318,72 @@ Napi::Object DetectMultipleQRCodes(const Napi::CallbackInfo& info) {
         // Initialize QR code detector
         cv::QRCodeDetector qrDecoder;
         
-        // For now, detect single QR code (stable approach)
-        // Multi-QR detection can cause protobuf conflicts in some OpenCV builds
+        // Try to detect and decode QR code
         std::vector<cv::Point> points;
         std::string decodedData = qrDecoder.detectAndDecode(image, points);
+        
+        // If not detected, try multiple preprocessing approaches (same as single detection)
+        if (decodedData.empty()) {
+            cv::Mat gray;
+            if (image.channels() == 3) {
+                cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+            } else {
+                gray = image.clone();
+            }
+            
+            // Try various preprocessing methods
+            std::vector<std::pair<std::string, cv::Mat>> preprocessedImages;
+            
+            // Method 1: CLAHE
+            cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+            cv::Mat enhanced;
+            clahe->apply(gray, enhanced);
+            decodedData = qrDecoder.detectAndDecode(enhanced, points);
+            
+            // Method 2: Adaptive thresholding
+            if (decodedData.empty()) {
+                for (int blockSize : {11, 15, 21, 31, 51}) {
+                    cv::Mat binary;
+                    cv::adaptiveThreshold(gray, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                        cv::THRESH_BINARY, blockSize, 2);
+                    decodedData = qrDecoder.detectAndDecode(binary, points);
+                    if (!decodedData.empty()) break;
+                }
+            }
+            
+            // Method 3: Gamma correction
+            if (decodedData.empty()) {
+                for (double gamma : {0.5, 0.7, 1.5, 2.0}) {
+                    cv::Mat lookUpTable(1, 256, CV_8U);
+                    uchar* p = lookUpTable.ptr();
+                    for(int i = 0; i < 256; ++i)
+                        p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, gamma) * 255.0);
+                    
+                    cv::Mat corrected;
+                    cv::LUT(gray, lookUpTable, corrected);
+                    decodedData = qrDecoder.detectAndDecode(corrected, points);
+                    if (!decodedData.empty()) break;
+                }
+            }
+            
+            // Method 4: Resize + enhance
+            if (decodedData.empty()) {
+                cv::Mat resized;
+                cv::resize(gray, resized, cv::Size(), 1.5, 1.5, cv::INTER_CUBIC);
+                
+                cv::Ptr<cv::CLAHE> clahe2 = cv::createCLAHE(3.0, cv::Size(8, 8));
+                cv::Mat enhanced2;
+                clahe2->apply(resized, enhanced2);
+                
+                decodedData = qrDecoder.detectAndDecode(enhanced2, points);
+                if (!decodedData.empty() && !points.empty()) {
+                    for (auto& point : points) {
+                        point.x /= 1.5;
+                        point.y /= 1.5;
+                    }
+                }
+            }
+        }
 
         // Create result object
         Napi::Object result = Napi::Object::New(env);

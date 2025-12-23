@@ -1,6 +1,6 @@
 {
     "name": "qr-code-detector",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV.",
     "main": "index.js",
     "scripts": {
@@ -27,12 +27,12 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/maxim729467/qr-code-detector.git"
+        "url": "git+https://github.com/maxim729467/qr-detector.git"
     },
     "bugs": {
-        "url": "https://github.com/maxim729467/qr-code-detector/issues"
+        "url": "https://github.com/maxim729467/qr-detector/issues"
     },
-    "homepage": "https://github.com/maxim729467/qr-code-detector#readme",
+    "homepage": "https://github.com/maxim729467/qr-detector#readme",
     "dependencies": {
         "node-addon-api": "^7.1.0"
     },
