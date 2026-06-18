@@ -1,6 +1,7 @@
 #include <napi.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/objdetect.hpp>
+#include <opencv2/wechat_qrcode.hpp>
 #include <vector>
 #include <string>
 
@@ -8,6 +9,55 @@
 cv::Mat readImageFromBuffer(const Napi::Buffer<uint8_t>& buffer) {
     std::vector<uint8_t> vec(buffer.Data(), buffer.Data() + buffer.Length());
     return cv::imdecode(vec, cv::IMREAD_COLOR);
+}
+
+// Lazily-constructed singleton WeChat QRCode detector (CNN + super-resolution).
+// Far more robust than the classic cv::QRCodeDetector on real-world frames
+// (curved phone screens, glare, small/low-contrast codes). Constructed once
+// per process from the model files in `modelDir`. If the models are missing or
+// OpenCV was built without the wechat_qrcode (contrib) module fails to load,
+// this returns nullptr and callers fall back to the classic detector.
+static cv::Ptr<cv::wechat_qrcode::WeChatQRCode> getWeChatDetector(const std::string& modelDir) {
+    static bool tried = false;
+    static bool ok = false;
+    static cv::Ptr<cv::wechat_qrcode::WeChatQRCode> detector;
+
+    if (modelDir.empty()) return nullptr;
+    if (tried) return ok ? detector : nullptr;
+    tried = true;
+
+    try {
+        detector = cv::makePtr<cv::wechat_qrcode::WeChatQRCode>(
+            modelDir + "/detect.prototxt",
+            modelDir + "/detect.caffemodel",
+            modelDir + "/sr.prototxt",
+            modelDir + "/sr.caffemodel");
+        ok = true;
+        return detector;
+    } catch (const std::exception& e) {
+        // Models missing/corrupt — degrade gracefully to the classic detector.
+        ok = false;
+        return nullptr;
+    }
+}
+
+// Convert a WeChat corner Mat (4x2 float: one row per corner) to cv::Point list.
+static std::vector<cv::Point> wechatPointsToVec(const cv::Mat& m) {
+    std::vector<cv::Point> pts;
+    for (int i = 0; i < m.rows; i++) {
+        pts.emplace_back(
+            static_cast<int>(m.at<float>(i, 0)),
+            static_cast<int>(m.at<float>(i, 1)));
+    }
+    return pts;
+}
+
+// Optional model dir argument (index N). Empty string when not provided.
+static std::string getModelDirArg(const Napi::CallbackInfo& info, size_t idx) {
+    if (info.Length() > idx && info[idx].IsString()) {
+        return info[idx].As<Napi::String>().Utf8Value();
+    }
+    return "";
 }
 
 // Main QR code detection function
@@ -41,11 +91,26 @@ Napi::Object DetectQRCode(const Napi::CallbackInfo& info) {
 
         // Initialize QR code detector
         cv::QRCodeDetector qrDecoder;
-        
-        // Try to detect and decode QR code
+
         std::vector<cv::Point> points;
-        std::string decodedData = qrDecoder.detectAndDecode(image, points);
-        
+        std::string decodedData;
+
+        // Primary: WeChat QRCode (CNN-based, robust on curved/low-quality frames).
+        auto wechat = getWeChatDetector(getModelDirArg(info, 1));
+        if (wechat) {
+            std::vector<cv::Mat> wpoints;
+            std::vector<std::string> wresults = wechat->detectAndDecode(image, wpoints);
+            if (!wresults.empty() && !wresults[0].empty()) {
+                decodedData = wresults[0];
+                if (!wpoints.empty()) points = wechatPointsToVec(wpoints[0]);
+            }
+        }
+
+        // Fallback: classic detector.
+        if (decodedData.empty()) {
+            decodedData = qrDecoder.detectAndDecode(image, points);
+        }
+
         // If not detected, try multiple preprocessing approaches
         if (decodedData.empty()) {
             cv::Mat gray;
@@ -317,11 +382,26 @@ Napi::Object DetectMultipleQRCodes(const Napi::CallbackInfo& info) {
 
         // Initialize QR code detector
         cv::QRCodeDetector qrDecoder;
-        
-        // Try to detect and decode QR code
+
         std::vector<cv::Point> points;
-        std::string decodedData = qrDecoder.detectAndDecode(image, points);
-        
+        std::string decodedData;
+
+        // Primary: WeChat QRCode (CNN-based, robust on curved/low-quality frames).
+        auto wechat = getWeChatDetector(getModelDirArg(info, 1));
+        if (wechat) {
+            std::vector<cv::Mat> wpoints;
+            std::vector<std::string> wresults = wechat->detectAndDecode(image, wpoints);
+            if (!wresults.empty() && !wresults[0].empty()) {
+                decodedData = wresults[0];
+                if (!wpoints.empty()) points = wechatPointsToVec(wpoints[0]);
+            }
+        }
+
+        // Fallback: classic detector.
+        if (decodedData.empty()) {
+            decodedData = qrDecoder.detectAndDecode(image, points);
+        }
+
         // If not detected, try multiple preprocessing approaches (same as single detection)
         if (decodedData.empty()) {
             cv::Mat gray;

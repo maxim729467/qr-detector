@@ -13,7 +13,9 @@
             "-lopencv_core",
             "-lopencv_imgcodecs",
             "-lopencv_imgproc",
-            "-lopencv_objdetect"
+            "-lopencv_objdetect",
+            "-lopencv_dnn",
+            "-lopencv_wechat_qrcode"
         ],
         "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS"],
         "conditions": [
@@ -34,7 +36,9 @@
                     "-lopencv_core",
                     "-lopencv_imgproc",
                     "-lopencv_imgcodecs",
-                    "-lopencv_objdetect"
+                    "-lopencv_objdetect",
+                    "-lopencv_dnn",
+                    "-lopencv_wechat_qrcode"
                 ]
             }],
             ["OS=='linux'", {

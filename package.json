@@ -1,7 +1,7 @@
 {
     "name": "qr-code-detector",
-    "version": "1.0.2",
-    "description": "QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV.",
+    "version": "1.1.0",
+    "description": "QR code detection and decoding with base64 image extraction. Native Node.js addon using OpenCV (WeChat CNN detector with classic fallback).",
     "main": "index.js",
     "scripts": {
         "install": "node-gyp rebuild",

@@ -1,9 +1,7 @@
-// Load native addon directly (synchronous version to avoid worker thread protobuf conflicts)
-const { 
-  detectQRCode: nativeDetectQRCode, 
-  detectMultipleQRCodes: nativeDetectMultipleQRCodes,
-  hasQRCode: nativeHasQRCode 
-} = require('./build/Release/qr_code_detector');
+const path = require('path');
+const { detectQRCode: nativeDetectQRCode, detectMultipleQRCodes: nativeDetectMultipleQRCodes, hasQRCode: nativeHasQRCode } = require('./build/Release/qr_code_detector');
+
+const MODEL_DIR = process.env.WECHAT_MODEL_DIR || path.join(__dirname, 'models');
 
 /**
  * Detects and decodes a single QR code in an image.
@@ -15,7 +13,7 @@ const {
  *   - corners {Array<{x: number, y: number}>} - Corner points of the QR code (if detected)
  */
 async function detectQRCode(input) {
-  return Promise.resolve(nativeDetectQRCode(input));
+  return Promise.resolve(nativeDetectQRCode(input, MODEL_DIR));
 }
 
 /**
@@ -30,7 +28,7 @@ async function detectQRCode(input) {
  *     - corners {Array<{x: number, y: number}>} - Corner points of the QR code
  */
 async function detectMultipleQRCodes(input) {
-  return Promise.resolve(nativeDetectMultipleQRCodes(input));
+  return Promise.resolve(nativeDetectMultipleQRCodes(input, MODEL_DIR));
 }
 
 /**
@@ -47,8 +45,8 @@ async function hasQRCode(input) {
 }
 
 // Also export synchronous versions
-const detectQRCodeSync = nativeDetectQRCode;
-const detectMultipleQRCodesSync = nativeDetectMultipleQRCodes;
+const detectQRCodeSync = (input) => nativeDetectQRCode(input, MODEL_DIR);
+const detectMultipleQRCodesSync = (input) => nativeDetectMultipleQRCodes(input, MODEL_DIR);
 const hasQRCodeSync = nativeHasQRCode;
 
 module.exports = {
@@ -59,4 +57,3 @@ module.exports = {
   detectMultipleQRCodesSync,
   hasQRCodeSync,
 };
-
